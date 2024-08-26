@@ -10,7 +10,7 @@ const Layout: FC<LayoutProps> = ({ children }) => (
   <html lang="en">
     <body>
       <header>
-        <h1>User management base</h1>
+        <h1>Document sharing</h1>
       </header>
       <main>{children}</main>
     </body>

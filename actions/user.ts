@@ -5,6 +5,17 @@ import { authorizeUser, oso } from "@/lib/oso";
 import { User } from "@/lib/relations";
 import { Result, stringifyError } from "@/lib/result";
 
+export interface OrgUser {
+  username: string;
+  org: string;
+  role: string;
+  // Permissions
+  readOrg: boolean;
+  createUser: boolean;
+  createOrg: boolean;
+  createDoc: boolean;
+}
+
 /**
  * Identifies a `User`, as well as fields describing its permissions on its
  * parent organization.
@@ -75,6 +86,13 @@ export async function getUserWOrgPermissions(
       "org"
     );
 
+    const createDocCond = await oso.listLocal(
+      osoUser,
+      "create_doc",
+      "Organization",
+      "org"
+    );
+
     const user = await client.query<UserWOrgPermissions>(
       `SELECT
         username,
@@ -82,7 +100,8 @@ export async function getUserWOrgPermissions(
         role,
         ${readOrgCond} as "readOrg",
         ${createUsersCond} as "createUser",
-        ${createOrgCond} as "createOrg"
+        ${createOrgCond} as "createOrg",
+        ${createDocCond} as "createDoc"
       FROM users
       WHERE username = $1`,
       [username]
@@ -337,6 +356,7 @@ export async function editUsersRoleByUsername(
   } catch (error) {
     client.query("ROLLBACK");
     console.error("Error in editUsersRoleByUsername:", error);
+    client.query("ROLLBACK");
     throw error;
   } finally {
     client.release();

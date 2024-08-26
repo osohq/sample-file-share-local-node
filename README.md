@@ -1,56 +1,84 @@
-This code provides a base from which other sample apps should be built.
-Primarily, this code includes a NextJs app w/ a PostgreSQL backend, orchestrated
-through Docker compose.
+# Oso Cloud document sharing example application
 
-Feature-wise, this code provides a "boilerplate" multi-tenant user management
-system, which allows:
+This application provides a reference for using Oso Cloud's [local
+authorization](https://www.osohq.com/docs/reference/authorization-data/local-authorization)
+to create a multi-tenant document sharing application.
 
-- Creating new tenants (`Organization`s)
-- Creating and deleting users in those tenants
-- Assigning users' roles within a tenant
-- "Impersonating" a user to view the app as the specified user
+## App UX
 
-Additional apps should retain this feature––either displaying it alongside the
-details of the new app, or allowing users to toggle it open via tabs.
+The application includes a multi-tenant-enabled user management system, which
+lets you create organizations (tenants), as well as users within those tenants
+with specific roles. When running the app, you have a super-admin like
+impersonation privilege that lets you view the application state as any given
+user.
 
-# Developing + deployment
+Users can create documents, which they can then share with other users,
+assigning them specific roles on the shared files. The only editable field of
+the documents are their titles, though other capabilities are more
+full-featured.
 
-This repo is meant to be the "home base" for this set of sample apps to ensure
-that they all easily retain a consistent base. Each additional sample app should
-be managed as a branch of this repo.
-
-| App                                                                   | Branch       |
-| --------------------------------------------------------------------- | ------------ |
-| [File sharing](https://github.com/osohq/sample-file-share-local-node) | `drive-like` |
-
-When making changes to the full-fledged sample apps, you can push to their repo
-using the appropriate branch, e.g. to push changes on `drive-like` to the file
-sharing app repo:
-
-```
-git push git@github.com:osohq/sample-file-share-local-node.git +drive-like:main
-```
-
-# Documentation + Examples
+## Reference files
 
 This app's primary purposes are providing reference and documentation for using
-Oso's local authorization. It is not meant to be a full-fledged sample
-application that demonstrates how to use React or Typescript in general (though
-using SDK features is great).
+Oso's local authorization.
 
-# User management "component"
+While any part of the code might be instructive, the primary set of
+documentation includes:
 
-This application provides a user management system from which other sample apps
-can be built––e.g. file sharing application––including a GUI.
+- Configuration to set up local authorization within an application
+- Integration of local authorization within the API
 
-This is necessary to do first because all other sample apps will be simpler to
-demo if you're able to easily see the impact that authorization has on different
-users' access to resources. For instance, if you share a file with another user,
-it's powerful to demonstrate that user can now access the file with the
-permissions you identified.
+Different components offer different examples of authorization patterns:
+
+| Component      | Pattern                                                                             |
+| -------------- | ----------------------------------------------------------------------------------- |
+| `Organization` | RBAC: [multi-tenancy], [global roles]                                               |
+| `User`         | ReBAC: [user-resource relations]                                                    |
+| `Document`     | RBAC: [resource roles], ReBAC: [user-resource relations], ABAC: [private resources] |
+
+[global roles]: https://www.osohq.com/docs/guides/role-based-access-control-rbac/globalroles
+[multi-tenancy]: https://www.osohq.com/docs/guides/role-based-access-control-rbac/roles
+[private resources]: https://www.osohq.com/docs/guides/attribute-based-access-control-abac/public
+[resource roles]: https://www.osohq.com/docs/guides/role-based-access-control-rbac/resourcespecific
+[user-resource relations]: https://www.osohq.com/docs/guides/relationship-based-access-control-rebac/ownership
+
+To get a holistic sense of using these authorization paradigms, look at both the
+configuration and integration files.
+
+### Configuration
+
+Configuring your app to use Oso Cloud's local authorization is demonstrated
+across a few files:
+
+| File                   | Use                                                               |
+| ---------------------- | ----------------------------------------------------------------- |
+| `db_init_template.sql` | The application's database schema                                 |
+| `oso-policy.polar`     | The authorization policy for this application                     |
+| `oso-local-auth.yaml`  | Configuration correlating your policy and your application's data |
+
+While there is a lot of inline documentation, you can find more documentation in
+[Oso Cloud's Local Authorization
+docs](https://www.osohq.com/docs/reference/authorization-data/local-authorization).
+
+### Integration
+
+This application's "backend" API implementation provides reference for
+integrating local auth with TypeScript.
+
+| File               | API for...                     |
+| ------------------ | ------------------------------ |
+| `/actions/org.ts`  | `Organization`s (tenants)      |
+| `/actions/user.ts` | `Users` within `Organization`s |
+| `/actions/doc.ts`  | `Document`s                    |
+
+This code currently uses React server components for the API. Even if you do not
+use React server components in your application, the examples are easily
+adaptable to any API structure––all of the patterns are amenable to any endpoint
+implementation.
 
 ## Architecture
 
+- Oso local auth for all authorization requests
 - NextJS with app routers for the back end
   - Automatic reload on changes
 - PostgreSQL
@@ -58,92 +86,66 @@ permissions you identified.
     variables.
 - Docker w/ compose to build and run both components
 
-## Oso integration
+## Running the app
 
-- Uses local auth exclusively
-
-## Expected UX
-
-1. Add `/oso-policy.polar` as the policy in the environment.
-1. Convert `.env.example` to `.env` with the appropriate values set, i.e. adding
-   your API key.
+1. [Log in to or create an Oso Cloud account](https://ui.osohq.com/).
+1. [Create an API key for the
+   application](https://www.osohq.com/docs/guides/production/manage-organization-settings#create-new-api-keys).
+   Make sure you save this!
+1. Copy `/oso-policy.polar` as the policy in the environment by deploying it.
+1. Convert `.env.example` to `.env` with the appropriate values set, e.g.
+   `OSO_CLOUD_API_KEY`.
+1. Install the dependencies using a Node.JS package manager, such as `npm` or
+   `yarn`.
 1. Run the app locally via:
+
    ```sh
    docker compose up --build
    ```
+
+   Note the provided `docker-compose.yml` file makes the PostgreSQL container
+   accessible from the host machine on port `5433`. This should reduce the
+   likelihood of interfering with any local PostgresSQL instances. Within Docker
+   compose network, it still runs on the standard port, `5432`.
+
+   If that port fails to work, grep for it in the provided code and change it to
+   any other value.
+
 1. Load the app at `http://localhost:3000`
-1. Click the user you want to impersonate.
-1. If the users has the requisite permissions you can:
 
-   - Add users
-   - Change users' roles
-   - Delete users
-   - Add new organizations
+From here you can create and manage:
 
-   Users without any of these features (i.e. `member`s), will just have their
-   information displayed. The white space here will be filled with the user's
-   view of the application with which this is integrated, e.g. their files and
-   folders.
+- `Organization`s
+- `User`s
+- `Document`s
 
-   You can also click the links of any users that you can manage to view the
-   application as they would, i.e. impersonation.
+## Demonstrating the app
+
+The application is meant to provided a means of creating tenants (Organizations)
+and users, and then letting users create a and share documents with one another.
+
+Going through these steps will demonstrate to you a number of its features.
+
+1. Go to <http://localhost:3000/user/root>.
+1. In **Create orgs**, enter `acme` and click **Add org**. You can now create
+   users in a separate tenant.
+1. In **Create users**, create a user named `alice` in the `acme` organization with the `admin` role, and then click **Add user**.
+1. Click the link for `alice`, or go to
+   <http://localhost:3000/user/alice>.
+1. Because `alice` is an admin, you will be able to create other users in the
+   `acme` organization here. Do that, creating a user `bob` who is a `member`.
+1. In the **alice Docs** section, click **Create doc**, and name it `private`.
+1. On the page that loads (which should be <http://localhost:3000/user/root/docs/1>), in the **Shareable** section, make `bob` and `editor`.
+1. Click `< Home` in the upper-left-hand corner, and then create another document called `public`.
+1. On the page that loads (which should be <http://localhost:3000/user/root/docs/2>), click **Set public**.
+1. Click `< Home` and then click the [`bob`](http://localhost:3000/user/bob) link.
+1. In the **bob Docs** section, you should see the following docs:
+   - `private` because `alice` explicitly shared the document with `bob`. If you visit the document, you can change its title, which will be visible to all users who can see it.
+   - `public` because `alice` and `bob` are both members of the same organization (`acme`) and the doc is public.
+
+To understand why and how this all works, you'll need to read the code!
 
 ## Notes + TODOs
-
-### New apps
-
-#### Getting started
-
-Check out the `main` branch, and then start a new branch with a descriptive name
-of the new application, e.g.
-
-- `hr-like`
-- `fintech-like`
-- `crm-like`
-- `health-like`
-
-#### Repo naming
-
-When you are ready to convert the branch into a full-fledged repo, use the
-following naming convention:
-
-`sample-{app descritpion}-local-node`
-
-This indiciates that this is a sample app of some type that uses `local`
-authorization, and is built in `node`.
-
-#### README
-
-When developing new applications, start with the `README.md` from the
-`drive-like` branch, which you can also see at
-<https://github.com/osohq/sample-file-share-local-node>.
-
-#### Documentation
-
-All of these apps should contain a _ton_ of inline documentation. For an example
-of the expected documentation, see the `main` branch's `ts` files in the
-`actions` directory.
-
-### Coding style
-
-Code in this repo + derived sample apps should be semantically thorough, but a
-lack of polish is totally acceptable.
-
-The distinction here is that we must be sure that our recommendations are viable
-in the context of a modern web app. I find it incredibly frustrating when a
-reference app doesn't deal with any the complexities of producing _actual_
-software, and the lack of consideration means that the examples provided are all
-but useless when I am trying to do something.
-
-While this does mean that the apps might take longer to build, they're much
-higher quality and give us many more opportunities to develop empathy with users
-who are trying to use Oso to produce _very_ expensive applications.
-
-### global permissions
-
-Currently `global` rules have an impedance mismatch with local authorization,
-i.e. local authorization cannot authorize users' access to `global` rules. This
-will be fixed once local authorization adopts the query builder API.
 
 ### Styling
 
@@ -151,14 +153,3 @@ TODO: Add a style to the app. Currently, the GUI is entirely unstyled HTML.
 
 I left all of the `tailwind` boilerplate in here because it seemed obnoxious to
 remove it and try to re-add it.
-
-### Contrived roles
-
-The policy is a bit over-engineered, e.g. editing and deleting users is split
-across separate permissions, even though there are currently no roles that can
-do one but not the other.
-
-### Posting policy
-
-TODO: When building, I would like to post the policy to Oso Cloud, so that
-`oso-policy.polar` locally is the authoritative source of truth.

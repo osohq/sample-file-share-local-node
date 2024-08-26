@@ -1,5 +1,3 @@
-
-
 # Our applications are meant to demonstrate multi-tenancy, and we will separate
 # tenants into separate, distinct `Organization`s.
 #
@@ -10,7 +8,7 @@ resource Organization {
     roles = ["admin", "member"];
 
     # Actions which users may try to take on an organization.
-    permissions = ["read", "create_user", "create"];
+    permissions = ["read", "create_user", "create", "create_doc"];
 
     # Role implication.
     "admin" if global "admin";
@@ -20,6 +18,9 @@ resource Organization {
     "create" if global "admin";
     "read" if "member";
     "create_user" if "admin";
+
+    ## Doc permissions
+    "create_doc" if "member";
 }
 
 # Our `global` roles will be identified as belonging to the `_` organization.
@@ -52,6 +53,51 @@ actor User {
     "read" if "member" on "parent";
     "edit_role" if "admin" on "parent";
     "delete" if "admin" on "parent";
+}
+
+# Documents represent objects with complex authorization properties including:
+# - RBAC: Users can have their own roles on documents, independent of their role
+#   in an organization.
+# - ReBAC: Users' permissions can be granted based on the Document's
+#   relationship to an Organization.
+# - ABAC: Documents have a `public` attribute, which influences Users'
+#   permissions.
+resource Document {
+  roles = ["owner", "manager", "editor", "viewer"];
+  permissions = [
+    "delete",
+    "assign_owner",
+    "manage_share",
+    "edit",
+    "read",
+    "set_public"
+  ];
+
+  relations = {
+    belongs_to: Organization
+  };
+
+  # ReBAC
+  "owner" if "admin" on "belongs_to";
+
+  # Role implication
+  "manager" if "owner";
+  "editor" if "manager";
+  "viewer" if "editor";
+
+  # RBAC
+  "delete" if "owner";
+  "assign_owner" if "owner";
+  "set_public" if "owner";
+
+  "manage_share" if "manager";
+
+  "edit" if "editor";
+
+  "read" if "viewer";
+
+  # ABAC + ReBAC: Members on the `belongs_to` organization can read public docs.
+  "read" if is_public(resource) and "member" on "belongs_to";
 }
 
 # For more details about how this interacts with other components of the system,

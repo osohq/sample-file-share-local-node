@@ -92,6 +92,20 @@ export async function createOrg(
  * @throws {Error} If there is a problem with the database connection.
  */
 export async function getCreateUserOrgs(username: string): Promise<Org[]> {
+  const osoUser = { type: "User", id: username };
+
+  // Determine the organizations for which the user has `create_user`
+  // permissions.
+  const canCreateUserOrgCond = await oso.listLocal(
+    osoUser,
+    "create_user",
+    "Organization",
+    "name"
+  );
+
+  // Inline the condition generated from `listLocal` into a query the get the
+  // organization's names.
+  const canCreateUserOrg = `SELECT organizations.name FROM organizations WHERE ${canCreateUserOrgCond}`;
   const client = await pool.connect();
   try {
     const osoUser = { type: "User", id: username };
