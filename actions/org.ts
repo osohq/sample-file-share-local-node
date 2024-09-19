@@ -92,20 +92,8 @@ export async function createOrg(
  * @throws {Error} If there is a problem with the database connection.
  */
 export async function getCreateUserOrgs(username: string): Promise<Org[]> {
-  const osoUser = { type: "User", id: username };
-
-  // Determine the organizations for which the user has `create_user`
-  // permissions.
-  const canCreateUserOrgCond = await oso.listLocal(
-    osoUser,
-    "create_user",
-    "Organization",
-    "name"
-  );
-
   // Inline the condition generated from `listLocal` into a query the get the
   // organization's names.
-  const canCreateUserOrg = `SELECT organizations.name FROM organizations WHERE ${canCreateUserOrgCond}`;
   const client = await pool.connect();
   try {
     const osoUser = { type: "User", id: username };
@@ -141,41 +129,4 @@ export async function getOrgRoles(): Promise<Role[]> {
   return query<Role>(
     `SELECT DISTINCT unnest(enum_range(NULL::organization_role)) AS name`
   );
-}
-
-/**
- * Return the name of the organization that a user belongs to.
- *
- * @throws {Error} If there is a problem with the database connection or there
- * are no users with the specified username.
- */
-export async function getUserOrg(
-  requestor: string,
-  username: string
-): Promise<string> {
-  const client = await pool.connect();
-  try {
-    const auth = await authorizeUser(client, requestor, "read", {
-      type: "User",
-      id: username,
-    });
-    if (!auth) {
-      throw new Error(`not permitted to read User ${username}`);
-    }
-
-    const users = await client.query<{ org: string }>(
-      `SELECT org FROM users WHERE username = $1;`,
-      [username]
-    );
-    const rows = users.rows;
-    if (rows.length != 1) {
-      throw new Error(`cannot find user ${username}`);
-    }
-    return rows[0].org;
-  } catch (error) {
-    console.error("Error in getUserOrg:", error);
-    throw error;
-  } finally {
-    client.release();
-  }
 }

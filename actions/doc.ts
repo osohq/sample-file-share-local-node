@@ -34,7 +34,7 @@ export async function getReadableDocuments(user: User): Promise<Document[]> {
     const docs = await client.query<Document>(readableDocs);
     return docs.rows;
   } catch (error) {
-    console.error("Error in getUserOrg:", error);
+    console.error("Error in getReadableDocuments:", error);
     throw error;
   } finally {
     client.release();
