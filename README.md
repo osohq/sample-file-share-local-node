@@ -119,6 +119,12 @@ From here you can create and manage:
 - `User`s
 - `Document`s
 
+### Using your own database
+
+You can configure the application to use your own database by point to it using
+your `.env` file. You will want to ensure you also populate the database using
+the contents of `db_init_template.sql`.
+
 ## Demonstrating the app
 
 The application is meant to provided a means of creating tenants (Organizations)
