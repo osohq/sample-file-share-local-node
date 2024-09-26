@@ -140,58 +140,35 @@ export async function getDocumentWPermissions(
   id: number
 ): Promise<ReadableDocument> {
   const osoUser = { type: "User", id: requestor };
+  const document = {
+    type: "Document",
+    id: id.toString(),
+  };
   const client = await pool.connect();
   try {
-    const readableDocCond = await oso.listLocal(
-      osoUser,
-      "read",
-      "Document",
-      "id"
-    );
-
-    const deleteDocCond = await oso.listLocal(
-      osoUser,
-      "delete",
-      "Document",
-      "id"
-    );
-
-    const assignOwnerCond = await oso.listLocal(
-      osoUser,
-      "assign_owner",
-      "Document",
-      "id"
-    );
-
-    const manageShareCond = await oso.listLocal(
-      osoUser,
-      "manage_share",
-      "Document",
-      "id"
-    );
-
-    const setPublicCond = await oso.listLocal(
-      osoUser,
-      "set_public",
-      "Document",
-      "id"
-    );
-
-    const editCond = await oso.listLocal(osoUser, "edit", "Document", "id");
-
-    const readableDocs = await client.query<ReadableDocument>(
-      `SELECT
+    // Determine actions available on document.
+    const actionsQuery = await oso.actionsLocal(osoUser, document);
+    const readableDocsQuery = `SELECT
         id,
         org,
         title,
         public,
-        ${deleteDocCond} as delete,
-        ${assignOwnerCond} as "assignOwner",
-        ${manageShareCond} as "manageShare",
-        ${editCond} as edit,
-        ${setPublicCond} as "setPublic"
+        'delete' = ANY(actions) AS delete,
+        'assign_owner' = ANY(actions) AS "assignOwner",
+        'manage_share' = ANY(actions) as "manageShare",
+        'edit' = ANY(actions) AS edit,
+        'delete' = ANY(actions) AS delete,
+        'set_public' = ANY(actions) AS "setPublic"
       FROM documents
-      WHERE id = $1 AND ${readableDocCond}`,
+      LEFT JOIN LATERAL (
+        SELECT array_agg(actions) AS actions FROM (
+            ${actionsQuery}
+        ) AS actions
+      ) AS actions ON true
+      WHERE id = $1 AND 'read' = ANY (actions)`;
+
+    const readableDocs = await client.query<ReadableDocument>(
+      readableDocsQuery,
       [id]
     );
 
